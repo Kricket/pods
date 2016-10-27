@@ -23,6 +23,7 @@ public class PodInfo {
 		p.angle = angle;
 		p.pos = pos.truncate();
 		p.nextCheck = checkpoints.get(nextCheck);
+		p.nextCheckId = nextCheck;
 		p.vel = vel;
 		return p;
 	}

@@ -144,11 +144,33 @@ The provided angle is absolute. 0° means facing EAST while 90° means facing SOUT
 		return angle + dAngle;
 	}
 
-	List<Vec> getCheckpoints() {
+	public List<Vec> getCheckpoints() {
 		return checkpoints;
 	}
 	
 	List<PodInfo> getPods() {
 		return pods;
+	}
+
+	/**
+	 * Set all pods back to their initial positions.
+	 */
+	public void reset() {
+		pods = new ArrayList<PodInfo>();
+		for(int i=0; i<players.size(); i++) {
+			PodInfo p = new PodInfo();
+			p.pos = checkpoints.get(checkpoints.size()-1);
+			pods.add(p);
+		}
+	}
+
+	/**
+	 * Get the state of the Pod for the given player.
+	 * @param player
+	 * @return
+	 */
+	public PodInfo getPod(Controller player) {
+		int index = players.indexOf(player);
+		return pods.get(index);
 	}
 }

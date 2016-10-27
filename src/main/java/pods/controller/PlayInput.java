@@ -9,6 +9,7 @@ public class PlayInput {
 	public Vec pos;
 	// Cheating here: this is supposed to be in degrees...
 	public double angle;
+	public int nextCheckId;
 	public Vec nextCheck;
 	public Vec vel;
 }
