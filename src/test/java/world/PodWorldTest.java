@@ -2,8 +2,10 @@ package world;
 
 import static org.junit.Assert.*;
 
+import org.junit.Assert;
 import org.junit.Test;
 
+import pods.controller.SimpleController;
 import util.Vec;
 
 public class PodWorldTest {
@@ -41,5 +43,19 @@ public class PodWorldTest {
 				}
 			}
 		}
+	}
+	
+	@Test
+	public void testReset() {
+		PodWorld p = new PodWorld();
+		SimpleController c = new SimpleController();
+		p.addPlayer(c);
+		
+		Vec startPos = p.getPod(c).pos;
+		p.step();
+		Assert.assertNotEquals(startPos, p.getPod(c).pos);
+		
+		p.reset();
+		Assert.assertEquals(startPos, p.getPod(c).pos);
 	}
 }
