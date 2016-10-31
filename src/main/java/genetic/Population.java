@@ -56,9 +56,11 @@ public class Population<T extends Individual<T>> {
 			
 			for(int cOp : crossoverOperations) {
 				T bastard = mom.crossover(dad, cOp);
-				for(int mOp : mutationOperations)
-					bastard.mutate(mOp);
-				population.add(bastard);
+				for(int mOp : mutationOperations) {
+					T mutant = bastard.clone();
+					mutant.mutate(mOp);
+					population.add(mutant);
+				}
 			}
 		}
 	}

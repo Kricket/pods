@@ -50,4 +50,6 @@ public abstract class Individual<Self extends Individual<?>> implements Comparab
 		int cmp = new Long(fitness()).compareTo(o.fitness());
 		return (cmp == 0 ? 1 : -cmp);
 	}
+	
+	abstract public Self clone();
 }

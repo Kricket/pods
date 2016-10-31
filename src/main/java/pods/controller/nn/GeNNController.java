@@ -1,8 +1,12 @@
 package pods.controller.nn;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import nn.GeNN;
@@ -36,9 +40,31 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		crossovers = Collections.unmodifiableSet(s);
 	}
 	
+	/**
+	 * The number of steps to go through in the world to calculate fitness.
+	 */
+	public static int STEPS_FOR_FITNESS = 10;
+	
 	private Collection<PodWorld> worlds;
 	private ControllerWrapper wrapper;
 	private PodWorld currentWorld;
+	
+	private static Map<PodWorld, List<Vec>> startingPositions = new HashMap<PodWorld, List<Vec>>();
+	private static final List<Vec> startingVelocities;
+	private static final List<Double> startingDirections;
+	static {
+		startingVelocities = new ArrayList<Vec>();
+		for(double angle = 0; angle < 2*Math.PI; angle+= Math.PI / 3.5) {
+			for(double mag = 0; mag < 650; mag += 200) {
+				startingVelocities.add(Vec.UNIT.rotate(angle).times(mag));
+			}
+		}
+		
+		startingDirections = new ArrayList<Double>();
+		for(double angle = 0; angle < 2*Math.PI; angle+= Math.PI / 4.5) {
+			startingDirections.add(angle);
+		}
+	}
 	
 	/**
 	 * Append the input and output layers to the given list of layer sizes.
@@ -62,14 +88,28 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		
 		this.worlds = worlds;
 		this.wrapper = wrapper;
+		
+		for(PodWorld world : worlds) {
+			if(!startingPositions.containsKey(world))
+				buildStartingPositions(world);
+		}
 	}
 	
+	private static void buildStartingPositions(PodWorld world) {
+		List<Vec> positions = new ArrayList<Vec>();
+		Vec check = world.getCheckpoints().get(0);
+		for(double angle=0; angle < 2*Math.PI; angle+=Math.PI/2.5) {
+			positions.add(Vec.UNIT.rotate(angle).times(3000.).plus(check));
+		}
+		startingPositions.put(world, positions);
+	}
+
 	/**
 	 * Copy constructor. Create another controller with the same weights and biases.
 	 * @param parent
 	 */
 	private GeNNController(GeNNController parent) {
-		super(parent.layers, parent.biases);
+		super(parent.weights, parent.biases);
 		worlds = parent.worlds;
 		wrapper = parent.wrapper;
 	}
@@ -85,27 +125,36 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	
 	@Override
 	protected long calculateFitness() {
+		wrapper.controller = this;
 		long total = 0;
-		for(PodWorld world : worlds)
-			total += calculateFitnessForWorld(world);
+		for(PodWorld world : worlds) {
+			currentWorld = world;
+			for(Vec pos : startingPositions.get(world)) {
+				for(Vec vel : startingVelocities) {
+					for(double dir : startingDirections) {
+						world.reset();
+						PodInfo pod = world.getPod(wrapper);
+						pod.pos = pos;
+						pod.vel = vel;
+						pod.angle = dir;
+						total += doCalculateFitness(pod);
+					}
+				}
+			}
+		}
 		return total;
 	}
 	
-	protected long calculateFitnessForWorld(PodWorld world) {
-		currentWorld = world;
-		wrapper.controller = this;
-		world.reset();
-		PodInfo pod = world.getPod(wrapper);
-		for(int i=0; i<100; i++) {
-			world.step();
+	protected long doCalculateFitness(PodInfo pod) {
+		for(int i=0; i<STEPS_FOR_FITNESS; i++) {
+			currentWorld.step();
 		}
 		
 		// Every checkpoint passed gives a bonus (equal to a rough estimate of the max distance between checks)
-		long score = (pod.laps * world.getCheckpoints().size() + pod.nextCheck) * CHECK_BONUS;
+		long score = (pod.laps * currentWorld.getCheckpoints().size() + pod.nextCheck) * CHECK_BONUS;
 		
 		// After that, extra points for being closer to the following check
-		Vec nextCheck = world.getCheckpoints().get(pod.nextCheck);
-		double dist = pod.pos.minus(nextCheck).norm();
+		double dist = pod.pos.minus(currentWorld.getCheckpoints().get(pod.nextCheck)).norm();
 		if(dist < CHECK_BONUS)
 			score += CHECK_BONUS - dist;
 		
@@ -117,12 +166,17 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		Matrix output = forward(input);
 		
 		PlayOutput play = new PlayOutput();
-		play.setDir(new Vec((output.at(0, 0) - 0.5) * 2 * PodWorld.WORLD_X, (output.at(1, 0) - 0.5) * 2 * PodWorld.WORLD_Y));
+		play.setDir(new Vec((output.at(0, 0) - 0.5) * 2. * PodWorld.WORLD_X, (output.at(1, 0) - 0.5) * 2. * PodWorld.WORLD_Y));
 		
-		play.setThrust((int) (output.at(2, 0) * 101));
+		play.setThrust((int) (output.at(2, 0) * 101.));
 		return play;
 	}
 
+	/**
+	 * Build a Matrix to feed to the network, equivalent to the given input
+	 * @param pi
+	 * @return
+	 */
 	private Matrix buildInput(PlayInput pi) {
 		Matrix m = new Matrix(INPUT_SIZE, 1);
 		Vec dir = Vec.UNIT.rotate(pi.angle);
@@ -147,9 +201,9 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 
 	public void mutate(int op) {
 		Matrix m;
-		int layer = (int) (Math.random() * layers.length);
+		int layer = (int) (Math.random() * weights.length);
 		if(Math.random() > 0.5) {
-			m = layers[layer];
+			m = weights[layer];
 		} else {
 			m = biases[layer];
 		}
@@ -157,7 +211,7 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		
 		switch(op) {
 		case MUT_REPLACE:
-			m.data[idx] = Math.random();
+			m.data[idx] = (Math.random() - 0.5) * getInitialRange();
 			break;
 		case MUT_SIGN:
 			m.data[idx] *= -1;
@@ -174,13 +228,13 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	public GeNNController crossover(GeNNController partner, int op) {
 		GeNNController baby = new GeNNController(this);
 		Matrix b, p;
-		int layer = (int) (Math.random() * layers.length);
+		int layer = (int) (Math.random() * weights.length);
 		
 		switch(op) {
 		case CROSS_WEIGHT:
 			if(Math.random() > 0.5) {
-				b = baby.layers[layer];
-				p = partner.layers[layer];
+				b = baby.weights[layer];
+				p = partner.weights[layer];
 			} else {
 				b = baby.biases[layer];
 				p = partner.biases[layer];
@@ -189,8 +243,8 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 			b.data[idx] = p.data[idx];
 			break;
 		case CROSS_NEURON:
-			b = baby.layers[layer];
-			p = partner.layers[layer];
+			b = baby.weights[layer];
+			p = partner.weights[layer];
 			
 			int neuron = (int) (Math.random() * b.rows);
 			for(int col=0; col<b.cols; col++) {
@@ -199,7 +253,7 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 			baby.biases[layer].set(neuron, 0, partner.biases[layer].at(neuron, 0));
 			break;
 		case CROSS_LAYER:
-			baby.layers[layer] = partner.layers[layer].copy();
+			baby.weights[layer] = partner.weights[layer].copy();
 			baby.biases[layer] = partner.biases[layer].copy();
 			break;
 		}
@@ -217,6 +271,11 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 
 	@Override
 	protected double getInitialRange() {
-		return .1;
+		return .2;
+	}
+
+	@Override
+	public GeNNController clone() {
+		return new GeNNController(this);
 	}
 }

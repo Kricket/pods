@@ -25,6 +25,9 @@ public class PodWorld {
 	public static final double MAX_TURN = Math.toRadians(18.);
 	public static final double FRICTION = 0.85;
 	
+	/**
+	 * The checkpoints. The last checkpoint is "home base", and new pods start there.
+	 */
 	private final List<Vec> checkpoints;
 	private List<PodInfo> pods = new ArrayList<PodInfo>();
 	private List<Controller> players = new ArrayList<Controller>();
@@ -182,5 +185,19 @@ The provided angle is absolute. 0° means facing EAST while 90° means facing SOUT
 	public PodInfo getPod(Controller player) {
 		int index = players.indexOf(player);
 		return pods.get(index);
+	}
+
+	@Override
+	public int hashCode() {
+		return checkpoints.hashCode();
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if(obj instanceof PodWorld) {
+			PodWorld p = (PodWorld) obj;
+			return checkpoints.equals(p.checkpoints);
+		}
+		return false;
 	}
 }

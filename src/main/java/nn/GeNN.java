@@ -8,30 +8,29 @@ import genetic.Individual;
  * @param <Self> Set to the type of your class
  */
 public abstract class GeNN<Self extends Individual<?>> extends Individual<Self> {
-
 	/**
 	 * All layers, except the first one
 	 */
-	protected final Matrix[] layers;
+	protected final Matrix[] weights;
 	protected final Matrix[] biases;
 	
 	/**
 	 * @param nLayers The number of neurons in each layer, from input to output
 	 */
 	public GeNN(int ...nLayers) {
-		layers = new Matrix[nLayers.length - 1];
+		weights = new Matrix[nLayers.length - 1];
 		biases = new Matrix[nLayers.length - 1];
-		for(int i=0; i<layers.length; i++) {
-			layers[i] = Matrix.random(nLayers[i+1], nLayers[i], getInitialRange());
+		for(int i=0; i<weights.length; i++) {
+			weights[i] = Matrix.random(nLayers[i+1], nLayers[i], getInitialRange());
 			biases[i] = Matrix.random(nLayers[i+1], 1, getInitialRange());
 		}
 	}
 	
 	public GeNN(Matrix[] layersCopy, Matrix[] biasesCopy) {
-		layers = new Matrix[layersCopy.length];
+		weights = new Matrix[layersCopy.length];
 		biases = new Matrix[biasesCopy.length];
-		for(int i=0; i<layers.length; i++) {
-			layers[i] = layersCopy[i].copy();
+		for(int i=0; i<weights.length; i++) {
+			weights[i] = layersCopy[i].copy();
 			biases[i] = biasesCopy[i].copy();
 		}
 	}
@@ -46,9 +45,9 @@ public abstract class GeNN<Self extends Individual<?>> extends Individual<Self> 
 	 * @param layer 0 is the input layer; the last is the output layer
 	 */
 	public int numNeurons(int layer) {
-		if(layer == layers.length)
-			return layers[layers.length - 1].rows;
-		return layers[layer].cols;
+		if(layer == weights.length)
+			return weights[weights.length - 1].rows;
+		return weights[layer].cols;
 	}
 	
 	/**
@@ -57,10 +56,10 @@ public abstract class GeNN<Self extends Individual<?>> extends Individual<Self> 
 	 * @return
 	 */
 	public Matrix forward(Matrix input) {
-		for(int i=0; i<layers.length-1; i++) {
-			input = sigma(layers[i].times(input).plusEquals(biases[i]));
+		for(int i=0; i<weights.length-1; i++) {
+			input = sigma(weights[i].times(input).plusEquals(biases[i]));
 		}
-		input = layers[layers.length-1].times(input).plusEquals(biases[layers.length-1]);
+		input = weights[weights.length-1].times(input).plusEquals(biases[weights.length-1]);
 		return input;
 	}
 	

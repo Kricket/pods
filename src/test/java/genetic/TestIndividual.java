@@ -43,4 +43,9 @@ public class TestIndividual extends Individual<TestIndividual> {
 		return CROSS_OPS;
 	}
 
+	@Override
+	public TestIndividual clone() {
+		return new TestIndividual();
+	}
+
 }
