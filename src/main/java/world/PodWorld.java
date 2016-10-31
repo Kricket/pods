@@ -1,7 +1,6 @@
 package world;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import pods.controller.Controller;
@@ -11,11 +10,14 @@ import util.Vec;
 
 public class PodWorld {
 	/** Dimensions of the world */
-	public static final int WORLD_X = 16000, WORLD_Y = 9000;
+	public static final double WORLD_X = 16000, WORLD_Y = 9000;
 	/** Padding for checkpoints around the border */
 	public static final int BORDER_PADDING = 1000;
 	/** Minimum space between two checkpoints */
 	public static final double CHECK_SPACING = 3000;
+	/**
+	 * Default range of number of checkpoints
+	 */
 	public static final int MIN_CHECKS = 3, MAX_CHECKS = 6;
 	
 	public static final double CHECK_RADIUS = 600;
@@ -27,14 +29,22 @@ public class PodWorld {
 	private List<PodInfo> pods = new ArrayList<PodInfo>();
 	private List<Controller> players = new ArrayList<Controller>();
 	
+	/**
+	 * Create a world with a number of checkpoints between MAX and MIN.
+	 */
 	public PodWorld() {
-		int numChecks = (int) (Math.random() * (MAX_CHECKS - MIN_CHECKS) + MIN_CHECKS);
-		List<Vec> checks = new ArrayList<Vec>(numChecks);
+		this((int) (Math.random() * (MAX_CHECKS - MIN_CHECKS) + MIN_CHECKS));
+	}
+	
+	public PodWorld(int numChecks) {
+		checkpoints = new ArrayList<Vec>(numChecks);
 		for(int i=0; i<numChecks; i++) {
-			checks.add(generateCheckpoint(checks));
+			checkpoints.add(generateCheckpoint(checkpoints));
 		}
-		
-		checkpoints = Collections.unmodifiableList(checks);
+	}
+	
+	public PodWorld(List<Vec> checks) {
+		checkpoints = new ArrayList<Vec>(checks);
 	}
 	
 	public void addPlayer(Controller c) {
@@ -51,15 +61,15 @@ public class PodWorld {
 	 * @param checks Current list of checkpoints
 	 * @return
 	 */
-	private Vec generateCheckpoint(List<Vec> checks) {
+	public static Vec generateCheckpoint(List<Vec> checks) {
 		Vec check;
 		do {
-			check = new Vec(Math.random() * WORLD_X, Math.random() * WORLD_Y);
+			check = new Vec(Math.random() * WORLD_X, Math.random() * WORLD_Y).truncate();
 		} while(!checkIsOK(check, checks));
 		return check;
 	}
 
-	private boolean checkIsOK(Vec check, List<Vec> checks) {
+	public static boolean checkIsOK(Vec check, List<Vec> checks) {
 		if(check.x < BORDER_PADDING || WORLD_X - check.x < BORDER_PADDING)
 			return false;
 		if(check.y < BORDER_PADDING || WORLD_Y - check.y < BORDER_PADDING)
@@ -120,11 +130,11 @@ The provided angle is absolute. 0° means facing EAST while 90° means facing SOUT
 		// Update next check
 		Vec nextCheck = checkpoints.get(pod.nextCheck);
 		if(nextCheck.minus(pod.pos).norm2() < CHECK_RADIUS*CHECK_RADIUS) {
-			System.out.println("Touched checkpoint " + pod.nextCheck);
+//			System.out.println("Touched checkpoint " + pod.nextCheck);
 			if(++pod.nextCheck >= checkpoints.size()) {
 				pod.nextCheck = 0;
 				pod.laps++;
-				System.out.println("-----------Laps completed: " + pod.laps);
+//				System.out.println("-----------Laps completed: " + pod.laps);
 			}
 		}
 	}
@@ -148,7 +158,7 @@ The provided angle is absolute. 0° means facing EAST while 90° means facing SOUT
 		return checkpoints;
 	}
 	
-	List<PodInfo> getPods() {
+	public List<PodInfo> getPods() {
 		return pods;
 	}
 

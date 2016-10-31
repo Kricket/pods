@@ -1,5 +1,6 @@
 package pods.controller.nn;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -15,7 +16,7 @@ import world.PodInfo;
 import world.PodWorld;
 
 public class GeNNController extends GeNN<GeNNController> implements Controller {
-	public static final int CHECK_BONUS = PodWorld.WORLD_X + PodWorld.WORLD_Y;
+	public static final long CHECK_BONUS = (long) (PodWorld.WORLD_X + PodWorld.WORLD_Y);
 	public static final int INPUT_SIZE = 10, OUTPUT_SIZE = 3;
 	public static final int MUT_REPLACE = 0, MUT_SIGN = 1, MUT_MULT = 2, MUT_ADD = 3;
 	public static final int CROSS_WEIGHT = 0, CROSS_NEURON = 1, CROSS_LAYER = 2;
@@ -35,8 +36,9 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		crossovers = Collections.unmodifiableSet(s);
 	}
 	
-	private PodWorld world;
+	private Collection<PodWorld> worlds;
 	private ControllerWrapper wrapper;
+	private PodWorld currentWorld;
 	
 	/**
 	 * Append the input and output layers to the given list of layer sizes.
@@ -55,10 +57,10 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	 * @param wrapper The wrapper that is used to substitute this Controller when calculating fitness
 	 * @param layers Sizes of the HIDDEN LAYERS ONLY! Input and output layers will automatically be added.
 	 */
-	public GeNNController(PodWorld world, ControllerWrapper wrapper, int ...layers) {
+	public GeNNController(Collection<PodWorld> worlds, ControllerWrapper wrapper, int ...layers) {
 		super(getRealLayers(layers));
 		
-		this.world = world;
+		this.worlds = worlds;
 		this.wrapper = wrapper;
 	}
 	
@@ -68,36 +70,55 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	 */
 	private GeNNController(GeNNController parent) {
 		super(parent.layers, parent.biases);
-		world = parent.world;
+		worlds = parent.worlds;
 		wrapper = parent.wrapper;
+	}
+	
+	/**
+	 * Set this Controller to be the one that actually plays.
+	 * @param world The world to play
+	 */
+	public void setActivePlayer(PodWorld world) {
+		wrapper.controller = this;
+		currentWorld = world;
 	}
 	
 	@Override
 	protected long calculateFitness() {
+		long total = 0;
+		for(PodWorld world : worlds)
+			total += calculateFitnessForWorld(world);
+		return total;
+	}
+	
+	protected long calculateFitnessForWorld(PodWorld world) {
+		currentWorld = world;
 		wrapper.controller = this;
 		world.reset();
-		for(int i=0; i<5; i++) {
+		PodInfo pod = world.getPod(wrapper);
+		for(int i=0; i<100; i++) {
 			world.step();
 		}
 		
-		PodInfo pod = world.getPod(wrapper);
-		
 		// Every checkpoint passed gives a bonus (equal to a rough estimate of the max distance between checks)
-		long score = pod.nextCheck*CHECK_BONUS;
-		Vec nextCheck = world.getCheckpoints().get(pod.nextCheck);
+		long score = (pod.laps * world.getCheckpoints().size() + pod.nextCheck) * CHECK_BONUS;
 		
 		// After that, extra points for being closer to the following check
-		score += CHECK_BONUS - pod.pos.minus(nextCheck).norm();
+		Vec nextCheck = world.getCheckpoints().get(pod.nextCheck);
+		double dist = pod.pos.minus(nextCheck).norm();
+		if(dist < CHECK_BONUS)
+			score += CHECK_BONUS - dist;
 		
 		return score;
 	}
-
+	
 	public PlayOutput play(PlayInput pi) {
 		Matrix input = buildInput(pi);
 		Matrix output = forward(input);
 		
 		PlayOutput play = new PlayOutput();
-		play.setDir(new Vec(output.at(0, 0) * PodWorld.WORLD_X, output.at(1, 0) * PodWorld.WORLD_Y));
+		play.setDir(new Vec((output.at(0, 0) - 0.5) * 2 * PodWorld.WORLD_X, (output.at(1, 0) - 0.5) * 2 * PodWorld.WORLD_Y));
+		
 		play.setThrust((int) (output.at(2, 0) * 101));
 		return play;
 	}
@@ -105,48 +126,48 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	private Matrix buildInput(PlayInput pi) {
 		Matrix m = new Matrix(INPUT_SIZE, 1);
 		Vec dir = Vec.UNIT.rotate(pi.angle);
-		Vec followingCheck = world.getCheckpoints().get(pi.nextCheckId);
+		Vec pos = pi.pos.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
+		Vec vel = pi.vel.scale(1. / 700., 1. / 700.);
+		Vec nextCheck = pi.nextCheck.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
+		Vec followingCheck = currentWorld.getCheckpoints().get(pi.nextCheckId).scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
 		
-		m.set(0, 0, pi.pos.x);
-		m.set(1, 0, pi.pos.y);
-		m.set(2, 0, pi.vel.x);
-		m.set(3, 0, pi.vel.y);
+		m.set(0, 0, pos.x);
+		m.set(1, 0, pos.y);
+		m.set(2, 0, vel.x);
+		m.set(3, 0, vel.y);
 		m.set(4, 0, dir.x);
 		m.set(5, 0, dir.y);
-		m.set(6, 0, pi.nextCheck.x);
-		m.set(7, 0, pi.nextCheck.y);
+		m.set(6, 0, nextCheck.x);
+		m.set(7, 0, nextCheck.y);
 		m.set(8, 0, followingCheck.x);
 		m.set(9, 0, followingCheck.y);
 		
 		return m;
 	}
 
-	public static final int MUTATIONS = 1;
 	public void mutate(int op) {
-		for(int i=0; i<MUTATIONS; i++) {
-			Matrix m;
-			int layer = (int) (Math.random() * layers.length);
-			if(Math.random() > 0.5) {
-				m = layers[layer];
-			} else {
-				m = biases[layer];
-			}
-			int idx = (int) (Math.random() * m.data.length);
-			
-			switch(op) {
-			case MUT_REPLACE:
-				m.data[idx] = Math.random();
-				break;
-			case MUT_SIGN:
-				m.data[idx] *= -1;
-				break;
-			case MUT_MULT:
-				m.data[idx] *= (Math.random() + 0.5);
-				break;
-			case MUT_ADD:
-				m.data[idx] += (Math.random() * 2. - 1.);
-				break;
-			}
+		Matrix m;
+		int layer = (int) (Math.random() * layers.length);
+		if(Math.random() > 0.5) {
+			m = layers[layer];
+		} else {
+			m = biases[layer];
+		}
+		int idx = (int) (Math.random() * m.data.length);
+		
+		switch(op) {
+		case MUT_REPLACE:
+			m.data[idx] = Math.random();
+			break;
+		case MUT_SIGN:
+			m.data[idx] *= -1;
+			break;
+		case MUT_MULT:
+			m.data[idx] *= (Math.random() + 0.5);
+			break;
+		case MUT_ADD:
+			m.data[idx] += (Math.random() - .5);
+			break;
 		}
 	}
 
@@ -192,5 +213,10 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 
 	public Set<Integer> crossoverOperations() {
 		return crossovers;
+	}
+
+	@Override
+	protected double getInitialRange() {
+		return .1;
 	}
 }

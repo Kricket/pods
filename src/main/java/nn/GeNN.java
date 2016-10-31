@@ -7,14 +7,13 @@ import genetic.Individual;
  * Basic feedforward neural network for use with genetic learning
  * @param <Self> Set to the type of your class
  */
-public abstract class GeNN<Self extends Individual<?>> implements Individual<Self> {
+public abstract class GeNN<Self extends Individual<?>> extends Individual<Self> {
 
 	/**
 	 * All layers, except the first one
 	 */
 	protected final Matrix[] layers;
 	protected final Matrix[] biases;
-	private long lastFitness = -1;
 	
 	/**
 	 * @param nLayers The number of neurons in each layer, from input to output
@@ -23,8 +22,8 @@ public abstract class GeNN<Self extends Individual<?>> implements Individual<Sel
 		layers = new Matrix[nLayers.length - 1];
 		biases = new Matrix[nLayers.length - 1];
 		for(int i=0; i<layers.length; i++) {
-			layers[i] = Matrix.random(nLayers[i+1], nLayers[i], 1);
-			biases[i] = Matrix.random(nLayers[i+1], 1, 1);
+			layers[i] = Matrix.random(nLayers[i+1], nLayers[i], getInitialRange());
+			biases[i] = Matrix.random(nLayers[i+1], 1, getInitialRange());
 		}
 	}
 	
@@ -36,6 +35,11 @@ public abstract class GeNN<Self extends Individual<?>> implements Individual<Sel
 			biases[i] = biasesCopy[i].copy();
 		}
 	}
+	
+	/**
+	 * Get the initial range of random values available to initialize the matrices.
+	 */
+	protected abstract double getInitialRange();
 
 	/**
 	 * Get the number of neurons in the given layer.
@@ -65,31 +69,16 @@ public abstract class GeNN<Self extends Individual<?>> implements Individual<Sel
 	 * @param z
 	 * @return
 	 */
-	private double sigma(double z) {
+	public static double sigma(double z) {
 		return 1. / (Math.expm1(-z) + 2.);
 	}
 	
 	/**
 	 * Apply the sigma function to every element of the given Matrix. Note that this will CHANGE the matrix!
 	 */
-	private Matrix sigma(Matrix m) {
+	public static Matrix sigma(Matrix m) {
 		for(int i=0; i<m.data.length; i++)
 			m.data[i] = sigma(m.data[i]);
 		return m;
-	}
-
-	public long fitness() {
-		if(lastFitness < 0)
-			lastFitness = calculateFitness();
-		return lastFitness;
-	}
-
-	/**
-	 * Actually calculate the fitness value.
-	 */
-	protected abstract long calculateFitness();
-
-	public void clearFitness() {
-		lastFitness = -1;
 	}
 }

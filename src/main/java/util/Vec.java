@@ -4,6 +4,7 @@ public final class Vec {
 	public static final Vec ORIGIN = new Vec(0,0), UNIT = new Vec(1,0);
 	
 	final public double x, y;
+	
 	public Vec(double _x, double _y) {
 		x = _x;
 		y = _y;
@@ -79,5 +80,23 @@ public final class Vec {
 
 	public double norm() {
 		return Math.sqrt(norm2());
+	}
+
+	@Override
+	public int hashCode() {
+		return (int) (10000*(x+y));
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if(obj instanceof Vec) {
+			Vec v = (Vec) obj;
+			return x == v.x && y == v.y;
+		}
+		return false;
+	}
+
+	public Vec scale(double d, double e) {
+		return new Vec(x * d, y * e);
 	}
 }

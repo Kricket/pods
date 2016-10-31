@@ -2,27 +2,29 @@ package genetic;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 public class Population<T extends Individual<T>> {
-	private class FitnessComparator implements Comparator<T> {
-		public int compare(T o1, T o2) {
-			return (o1.fitness() < o2.fitness() ? 1 : (o1.fitness() == o2.fitness() ? 0 : -1));
-		}
-	}
+	public static final int MIN_POP_SIZE = 2;
 	
 	/**
 	 * The members of this population.
 	 */
 	private Set<T> population;
 	private List<T> results;
+	private final int POP_SIZE;
 	
 	public Population(int num, IndividualFactory<T> factory) {
+		if(num < MIN_POP_SIZE)
+			throw new IllegalArgumentException("A population must have at least "+MIN_POP_SIZE+" individuals");
+		POP_SIZE = num;
 		population = new HashSet<T>();
-		for(T indiv : factory.generate(num))
+		for(T indiv : factory.generate(POP_SIZE))
 			population.add(indiv);
 	}
 	
@@ -32,52 +34,60 @@ public class Population<T extends Individual<T>> {
 			indiv.clearFitness();
 			results.add(indiv);
 		}
-		
-		Collections.sort(results, new FitnessComparator());
-		System.out.println("Best is " + results.get(0).fitness() + " worst is " + results.get(results.size()-1).fitness());
-		
+		Collections.sort(results);
+		System.out.println("best " + results.get(0).fitness() + " worst " + results.get(results.size()-1).fitness());
+
 		// Now, rebuild the population.
 		population = new HashSet<T>();
+		
+		// Elitism: keep the best
+		for(int i=0; i<POP_SIZE / 30; i++)
+			population.add(results.get(i));
+		
 		Set<Integer> crossoverOperations = results.get(0).crossoverOperations();
 		Set<Integer> mutationOperations = results.get(0).mutationOperations();
-		// Kill the losers
-		results.subList(results.size()/2, results.size()).clear();
 		
-		for(Integer op : mutationOperations) {
-			for(T indiv : results) {
-				indiv.mutate(op);
+		double p = 0.6;
+		int k = 2;
+		while(population.size() < POP_SIZE) {
+			T mom = tournamentSelect(results, p, k);
+			T dad;
+			while((dad = tournamentSelect(results, p, k)) == mom);
+			
+			for(int cOp : crossoverOperations) {
+				T bastard = mom.crossover(dad, cOp);
+				for(int mOp : mutationOperations)
+					bastard.mutate(mOp);
+				population.add(bastard);
 			}
 		}
-		
-		for(Integer op : crossoverOperations) {
-			for(int i=0; i<2*results.size()/crossoverOperations.size(); i++) {
-				// For the remaining ones, make babies!
-				int dad = (int) (Math.random() * results.size());
-				int mom;
-				while((mom = (int) (Math.random() * results.size())) == dad);
-				T child = results.get(mom).crossover(results.get(dad), op);
-				population.add(child);
-			}
+	}
+
+	/**
+	 * Use tournament selection to select an individual from the given population.
+	 * @param pop The population
+	 * @param p Probability of the fittest winning the tournament
+	 * @param k Size of the tournament
+	 * @return
+	 */
+	public static <T> T tournamentSelect(List<T> pop, double p, int k) {
+		SortedSet<T> set = new TreeSet<T>();
+		while(set.size() < k) {
+			set.add(pop.get((int) (Math.random() * pop.size())));
 		}
 		
-		/*
-		int survivors = population.size() / 2;
-		
-		for(int i=0; i<survivors; i++) {
-			T mutant = results.get(i);
-			mutant.mutate();
-			population.add(mutant);
+		double guess = Math.random();
+		Iterator<T> iterator = set.iterator();
+		T chosen = iterator.next();
+		double pp = p;
+		while(guess > pp && iterator.hasNext()) {
+			chosen = iterator.next();
+			pp += (p * (1-pp));
 		}
-		
-		for(int i=survivors; i<results.size(); i++) {
-			// For the remaining ones, make babies!
-			int dad = (int) (Math.random() * survivors);
-			int mom;
-			while((mom = (int) (Math.random() * survivors)) == dad);
-			T child = results.get(mom).crossover(results.get(dad));
-			population.add(child);
-		}
-		*/
-		
+		return chosen;
+	}
+
+	public Set<T> getPopulation() {
+		return population;
 	}
 }
