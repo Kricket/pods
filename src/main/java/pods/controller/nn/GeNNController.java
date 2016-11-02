@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,7 +22,7 @@ import world.PodWorld;
 
 public class GeNNController extends GeNN<GeNNController> implements Controller {
 	public static final long CHECK_BONUS = (long) (PodWorld.WORLD_X + PodWorld.WORLD_Y);
-	public static final int INPUT_SIZE = 10, OUTPUT_SIZE = 3;
+	public static final int INPUT_SIZE = 8, OUTPUT_SIZE = 3;
 	public static final int MUT_REPLACE = 0, MUT_SIGN = 1, MUT_MULT = 2, MUT_ADD = 3;
 	public static final int CROSS_WEIGHT = 0, CROSS_NEURON = 1, CROSS_LAYER = 2;
 	private static final Set<Integer> mutations, crossovers;
@@ -45,23 +46,63 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	 */
 	public static int STEPS_FOR_FITNESS = 10;
 	
-	private Collection<PodWorld> worlds;
-	private ControllerWrapper wrapper;
-	private PodWorld currentWorld;
+	/**
+	 * Get all GeNNControllers ready to test using the given worlds.
+	 * @param _worlds
+	 */
+	public static void prepare(Collection<PodWorld> worlds) {
+		wrapper = new ControllerWrapper();
+		for(PodWorld world : worlds) {
+			world.addPlayer(wrapper);
+			buildStartingPositions(world);
+		}
+	}
+	
+	private static void buildStartingPositions(PodWorld world) {
+		List<Vec> positions = new ArrayList<Vec>();
+		Vec check = world.getCheckpoints().get(0);
+		for(double angle=0; angle < 2*Math.PI; angle+=Math.PI/2.5) {
+			positions.add(Vec.UNIT.rotate(angle).times(3000.).plus(check));
+		}
+		Collections.shuffle(positions);
+		
+		startingPositions.put(world, positions);
+	}
+
+	private static Iterator<PodWorld> worldIt;
+	private static Iterator<Vec> posIt;
+	private static Vec startingPos;
+	public static void setupNextTest() {
+		if(posIt == null || !posIt.hasNext()) {
+			if(worldIt == null || !worldIt.hasNext()) {
+				worldIt = startingPositions.keySet().iterator();
+			}
+			
+			System.out.println("Changing worlds...");
+			currentWorld = worldIt.next();
+			posIt = startingPositions.get(currentWorld).iterator();
+		}
+		
+		System.out.println("Changing starting position...");
+		startingPos = posIt.next();
+	}
+	
+	private static ControllerWrapper wrapper;
+	private static PodWorld currentWorld;
 	
 	private static Map<PodWorld, List<Vec>> startingPositions = new HashMap<PodWorld, List<Vec>>();
 	private static final List<Vec> startingVelocities;
 	private static final List<Double> startingDirections;
 	static {
 		startingVelocities = new ArrayList<Vec>();
-		for(double angle = 0; angle < 2*Math.PI; angle+= Math.PI / 3.5) {
+		for(double angle = 0; angle < 2*Math.PI; angle += Math.PI / 2) {
 			for(double mag = 0; mag < 650; mag += 200) {
 				startingVelocities.add(Vec.UNIT.rotate(angle).times(mag));
 			}
 		}
 		
 		startingDirections = new ArrayList<Double>();
-		for(double angle = 0; angle < 2*Math.PI; angle+= Math.PI / 4.5) {
+		for(double angle = 0; angle < 2*Math.PI; angle += Math.PI / 2) {
 			startingDirections.add(angle);
 		}
 	}
@@ -83,63 +124,38 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	 * @param wrapper The wrapper that is used to substitute this Controller when calculating fitness
 	 * @param layers Sizes of the HIDDEN LAYERS ONLY! Input and output layers will automatically be added.
 	 */
-	public GeNNController(Collection<PodWorld> worlds, ControllerWrapper wrapper, int ...layers) {
+	public GeNNController(int ...layers) {
 		super(getRealLayers(layers));
-		
-		this.worlds = worlds;
-		this.wrapper = wrapper;
-		
-		for(PodWorld world : worlds) {
-			if(!startingPositions.containsKey(world))
-				buildStartingPositions(world);
-		}
 	}
 	
-	private static void buildStartingPositions(PodWorld world) {
-		List<Vec> positions = new ArrayList<Vec>();
-		Vec check = world.getCheckpoints().get(0);
-		for(double angle=0; angle < 2*Math.PI; angle+=Math.PI/2.5) {
-			positions.add(Vec.UNIT.rotate(angle).times(3000.).plus(check));
-		}
-		startingPositions.put(world, positions);
-	}
-
 	/**
 	 * Copy constructor. Create another controller with the same weights and biases.
 	 * @param parent
 	 */
 	private GeNNController(GeNNController parent) {
 		super(parent.weights, parent.biases);
-		worlds = parent.worlds;
-		wrapper = parent.wrapper;
 	}
 	
 	/**
 	 * Set this Controller to be the one that actually plays.
-	 * @param world The world to play
 	 */
-	public void setActivePlayer(PodWorld world) {
+	public void setActivePlayer() {
 		wrapper.controller = this;
-		currentWorld = world;
 	}
 	
 	@Override
 	protected long calculateFitness() {
 		wrapper.controller = this;
 		long total = 0;
-		for(PodWorld world : worlds) {
-			currentWorld = world;
-			for(Vec pos : startingPositions.get(world)) {
-				for(Vec vel : startingVelocities) {
-					for(double dir : startingDirections) {
-						world.reset();
-						PodInfo pod = world.getPod(wrapper);
-						pod.pos = pos;
-						pod.vel = vel;
-						pod.angle = dir;
-						total += doCalculateFitness(pod);
-					}
-				}
+		for(Vec vel : startingVelocities) {
+			for(double dir : startingDirections) {
+				PodInfo pod = currentWorld.getPod(wrapper);
+				pod.pos = startingPos;
+				pod.vel = vel;
+				pod.angle = dir;
+				pod.laps = 0;
+				pod.nextCheck = 0;
+				total += doCalculateFitness(pod);
 			}
 		}
 		return total;
@@ -166,7 +182,7 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		Matrix output = forward(input);
 		
 		PlayOutput play = new PlayOutput();
-		play.setDir(new Vec((output.at(0, 0) - 0.5) * 2. * PodWorld.WORLD_X, (output.at(1, 0) - 0.5) * 2. * PodWorld.WORLD_Y));
+		play.setDir(new Vec((output.at(0, 0) - 0.5) * 2. * PodWorld.WORLD_X, (output.at(1, 0) - 0.5) * 2. * PodWorld.WORLD_Y).plus(pi.pos));
 		
 		play.setThrust((int) (output.at(2, 0) * 101.));
 		return play;
@@ -180,21 +196,25 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	private Matrix buildInput(PlayInput pi) {
 		Matrix m = new Matrix(INPUT_SIZE, 1);
 		Vec dir = Vec.UNIT.rotate(pi.angle);
-		Vec pos = pi.pos.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
 		Vec vel = pi.vel.scale(1. / 700., 1. / 700.);
-		Vec nextCheck = pi.nextCheck.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
-		Vec followingCheck = currentWorld.getCheckpoints().get(pi.nextCheckId).scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
 		
-		m.set(0, 0, pos.x);
-		m.set(1, 0, pos.y);
-		m.set(2, 0, vel.x);
-		m.set(3, 0, vel.y);
-		m.set(4, 0, dir.x);
-		m.set(5, 0, dir.y);
-		m.set(6, 0, nextCheck.x);
-		m.set(7, 0, nextCheck.y);
-		m.set(8, 0, followingCheck.x);
-		m.set(9, 0, followingCheck.y);
+		// Make the checkpoints relative: the next check is relative to the pod...
+		Vec nextCheck = pi.nextCheck
+				.minus(pi.pos)
+				.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
+		// ...and the following check is relative to the next.
+		Vec followingCheck = currentWorld.getCheckpoints().get(pi.nextCheckId)
+				.minus(pi.nextCheck)
+				.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
+		
+		m.set(0, 0, vel.x);
+		m.set(1, 0, vel.y);
+		m.set(2, 0, dir.x);
+		m.set(3, 0, dir.y);
+		m.set(4, 0, nextCheck.x);
+		m.set(5, 0, nextCheck.y);
+		m.set(6, 0, followingCheck.x);
+		m.set(7, 0, followingCheck.y);
 		
 		return m;
 	}
