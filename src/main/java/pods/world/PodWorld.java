@@ -1,4 +1,4 @@
-package world;
+package pods.world;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -86,21 +86,37 @@ public class PodWorld {
 		return true;
 	}
 	
+	/**
+	 * Move the simulation forward one step.
+	 */
 	public void step() {
 		for(int i=0; i<pods.size(); i++) {
 			PodInfo pod = pods.get(i);
 			PlayInput pi = pod.buildPlayInfo(checkpoints);
 			PlayOutput play = players.get(i).play(pi);
-			update(pod, play);
+			update(pod, pod, play);
 		}
+	}
+	
+	/**
+	 * Test what would happen if the simulation were to move forward one step for the given pod and play.
+	 * @param pod
+	 * @param play
+	 * @return
+	 */
+	public PodInfo stepTest(PodInfo pod, PlayOutput play) {
+		PodInfo output = new PodInfo();
+		update(pod, output, play);
+		return output;
 	}
 
 	/**
-	 * Update the given pod with the given play.
-	 * @param pod
-	 * @param play
+	 * Fill the given output state with the result of running the given play for one step, from the given input state.
+	 * @param inputState Starting state of the pod to play
+	 * @param outputState Will be filled with the ending state after the play
+	 * @param play The play to make
 	 */
-	private void update(PodInfo pod, PlayOutput play) {
+	private void update(PodInfo inputState, PodInfo outputState, PlayOutput play) {
 		/*
 On each turn the pods movements are computed this way:
 
@@ -116,28 +132,29 @@ A shield multiplies the Pod mass by 10.
 The provided angle is absolute. 0° means facing EAST while 90° means facing SOUTH.
 		 */
 		// 1. Rotation
-		double requestedAngle = play.getDir().minus(pod.pos).getAngle();
-		double angle = getRealAngle(requestedAngle, pod.angle);
-		pod.angle = angle;
+		double requestedAngle = play.getDir().minus(inputState.pos).getAngle();
+		double angle = getRealAngle(requestedAngle, inputState.angle);
+		outputState.angle = angle;
 		
 		// 2. Acceleration
 		Vec dir = Vec.UNIT.rotate(angle);
-		pod.vel = pod.vel.plus(dir.times(play.getThrust()));
+		outputState.vel = inputState.vel.plus(dir.times(play.getThrust()));
 		
 		// 3. Movement
-		pod.pos = pod.pos.plus(pod.vel);
+		outputState.pos = inputState.pos.plus(outputState.vel);
 		
 		// 4. Friction
-		pod.vel = pod.vel.times(FRICTION);
+		outputState.vel = outputState.vel.times(FRICTION);
 		
 		// Update next check
-		Vec nextCheck = checkpoints.get(pod.nextCheck);
-		if(nextCheck.minus(pod.pos).norm2() < CHECK_RADIUS*CHECK_RADIUS) {
-//			System.out.println("Touched checkpoint " + pod.nextCheck);
-			if(++pod.nextCheck >= checkpoints.size()) {
-				pod.nextCheck = 0;
-				pod.laps++;
-//				System.out.println("-----------Laps completed: " + pod.laps);
+		outputState.nextCheck = inputState.nextCheck;
+		outputState.laps = inputState.laps;
+		Vec nextCheck = checkpoints.get(inputState.nextCheck);
+		
+		if(nextCheck.minus(outputState.pos).norm2() < CHECK_RADIUS*CHECK_RADIUS) {
+			if(++outputState.nextCheck >= checkpoints.size()) {
+				outputState.nextCheck = 0;
+				outputState.laps++;
 			}
 		}
 	}

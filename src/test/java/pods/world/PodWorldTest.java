@@ -1,4 +1,4 @@
-package world;
+package pods.world;
 
 import static org.junit.Assert.*;
 
@@ -6,6 +6,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import pods.controller.SimpleController;
+import pods.world.PodWorld;
 import util.Vec;
 
 public class PodWorldTest {

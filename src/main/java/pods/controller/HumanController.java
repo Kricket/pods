@@ -6,8 +6,8 @@ import java.awt.event.KeyEvent;
 import java.util.HashSet;
 import java.util.Set;
 
+import pods.world.PodWorld;
 import util.Vec;
-import world.PodWorld;
 
 public class HumanController implements KeyEventDispatcher, Controller {
 

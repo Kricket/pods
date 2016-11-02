@@ -1,4 +1,4 @@
-package world;
+package pods.world;
 
 import java.awt.Color;
 import java.awt.Graphics;

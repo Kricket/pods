@@ -15,10 +15,10 @@ import pods.controller.Controller;
 import pods.controller.ControllerWrapper;
 import pods.controller.PlayInput;
 import pods.controller.PlayOutput;
+import pods.world.PodInfo;
+import pods.world.PodWorld;
 import util.Matrix;
 import util.Vec;
-import world.PodInfo;
-import world.PodWorld;
 
 public class GeNNController extends GeNN<GeNNController> implements Controller {
 	public static final long CHECK_BONUS = (long) (PodWorld.WORLD_X + PodWorld.WORLD_Y);

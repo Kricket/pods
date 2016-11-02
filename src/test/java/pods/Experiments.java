@@ -7,15 +7,19 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 
+import org.junit.Test;
+
 import pods.controller.SimpleController;
 import pods.controller.nn.GeNNController;
 import pods.controller.nn.GeNNControllerFactory;
+import pods.world.Drawer;
+import pods.world.PodWorld;
 import util.Vec;
-import world.Drawer;
-import world.PodWorld;
 
-public class Main {
-	public static void main(String[] args) {
+public class Experiments {
+	
+	@Test
+	public void test() {
 		HashSet<PodWorld> worlds = buildWorlds();
 		GeNNController.prepare(worlds);
 		System.out.println("Number of worlds: " + worlds.size());
@@ -62,4 +66,5 @@ public class Main {
 	}
 	
 	private static final Vec MID = new Vec(PodWorld.WORLD_X/2, PodWorld.WORLD_Y/2);
+
 }
