@@ -12,14 +12,68 @@ import org.junit.Test;
 import pods.controller.SimpleController;
 import pods.controller.nn.GeNNController;
 import pods.controller.nn.GeNNControllerFactory;
+import pods.controller.tree.TreeSearchController;
 import pods.world.Drawer;
 import pods.world.PodWorld;
 import util.Vec;
 
 public class Experiments {
+	public static void main(String[] args) {
+		new Experiments().testTree();
+	}
+	
+	public void simple() {
+		PodWorld world = new PodWorld();
+		world.addPlayer(new SimpleController());
+		new Drawer(world);
+	}
+	
+	public void testTree() {
+		PodWorld world = new PodWorld();
+		new TreeSearchController(world);
+		new Drawer(world);
+	}
 	
 	@Test
-	public void test() {
+	public void testClimb() {
+		HashSet<PodWorld> worlds = buildWorlds();
+		GeNNController.prepare(worlds);
+		
+		GeNNController indiv = new GeNNController(10);
+		
+		GeNNController.STEPS_FOR_FITNESS = 5;
+		System.out.println("Steps: " + GeNNController.STEPS_FOR_FITNESS);
+		for(int i=0; i<10000; i++) {
+			indiv = indiv.climb();
+			if(i%100 == 0)
+				System.out.println("Best fitness: " + indiv.fitness());
+		}
+		
+		GeNNController.STEPS_FOR_FITNESS = 15;
+		System.out.println("Steps: " + GeNNController.STEPS_FOR_FITNESS);
+		for(int i=0; i<5000; i++) {
+			indiv = indiv.climb();
+			if(i%100 == 0)
+				System.out.println("Best fitness: " + indiv.fitness());
+		}
+		
+		GeNNController.STEPS_FOR_FITNESS = 50;
+		System.out.println("Steps: " + GeNNController.STEPS_FOR_FITNESS);
+		for(int i=0; i<1000; i++) {
+			indiv = indiv.climb();
+			if(i%100 == 0)
+				System.out.println("Best fitness: " + indiv.fitness());
+		}
+		
+		PodWorld world = worlds.iterator().next();
+		world.reset();
+		indiv.setActivePlayer();
+		new Drawer(world);
+		System.out.println("Running...");
+	}
+	
+//	@Test
+	public void testEvolve() {
 		HashSet<PodWorld> worlds = buildWorlds();
 		GeNNController.prepare(worlds);
 		System.out.println("Number of worlds: " + worlds.size());

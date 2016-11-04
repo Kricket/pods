@@ -152,6 +152,7 @@ The provided angle is absolute. 0° means facing EAST while 90° means facing SOUT
 		Vec nextCheck = checkpoints.get(inputState.nextCheck);
 		
 		if(nextCheck.minus(outputState.pos).norm2() < CHECK_RADIUS*CHECK_RADIUS) {
+			System.out.println("Just passed checkpoint " + outputState.nextCheck);
 			if(++outputState.nextCheck >= checkpoints.size()) {
 				outputState.nextCheck = 0;
 				outputState.laps++;

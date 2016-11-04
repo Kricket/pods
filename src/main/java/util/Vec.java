@@ -1,7 +1,12 @@
 package util;
 
 public final class Vec {
-	public static final Vec ORIGIN = new Vec(0,0), UNIT = new Vec(1,0);
+	/** The 0 vector */
+	public static final Vec ORIGIN = new Vec(0,0);
+	/** Unit vector (1,0) */
+	public static final Vec UNIT = new Vec(1,0);
+	/** Big vector on positive X axis */
+	public static final Vec BIGUNIT = new Vec(1000000., 0);
 	
 	final public double x, y;
 	

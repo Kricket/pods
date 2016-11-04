@@ -59,4 +59,29 @@ public class PodWorldTest {
 		p.reset();
 		Assert.assertEquals(startPos, p.getPod(c).pos);
 	}
+	
+	@Test
+	public void stepTestTest() {
+		PodWorld p = new PodWorld();
+		SimpleController c = new SimpleController();
+		p.addPlayer(c);
+		
+		assertEquals(1, p.getPods().size());
+		PodInfo pod = p.getPod(c);
+		assertEquals(pod, p.getPods().get(0));
+		
+		PodInfo stepped = p.stepTest(pod, c.play(pod.buildPlayInfo(p.getCheckpoints())));
+		assertNotEquals(stepped, pod);
+		assertEquals(1, p.getPods().size());
+		assertEquals(pod, p.getPods().get(0));
+		
+		p.step();
+		assertEquals(1, p.getPods().size());
+		assertEquals(pod, p.getPods().get(0));
+		assertEquals(pod.angle, stepped.angle, 0.000001);
+		assertEquals(pod.laps, stepped.laps);
+		assertEquals(pod.nextCheck, stepped.nextCheck);
+		assertEquals(pod.pos, stepped.pos);
+		assertEquals(pod.vel, stepped.vel);
+	}
 }

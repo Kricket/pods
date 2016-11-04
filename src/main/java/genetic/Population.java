@@ -16,20 +16,24 @@ public class Population<T extends Individual<T>> {
 	 * The members of this population.
 	 */
 	private Set<T> population;
-	private List<T> results;
-	private final int POP_SIZE;
+	
+	/**
+	 * The number of individuals in the population. If this is changed, it will be
+	 * reflected in the next generation.
+	 */
+	public int populationSize;
 	
 	public Population(int num, IndividualFactory<T> factory) {
 		if(num < MIN_POP_SIZE)
 			throw new IllegalArgumentException("A population must have at least "+MIN_POP_SIZE+" individuals");
-		POP_SIZE = num;
+		populationSize = num;
 		population = new HashSet<T>();
-		for(T indiv : factory.generate(POP_SIZE))
+		for(T indiv : factory.generate(populationSize))
 			population.add(indiv);
 	}
 	
 	public void newGeneration() {
-		results = new ArrayList<T>();
+		List<T> results = new ArrayList<T>();
 		for(T indiv : population) {
 			indiv.clearFitness();
 			results.add(indiv);
@@ -41,7 +45,7 @@ public class Population<T extends Individual<T>> {
 		population = new HashSet<T>();
 		
 		// Elitism: keep the best
-		for(int i=0; i<POP_SIZE / 30; i++)
+		for(int i=0; i<populationSize / 30; i++)
 			population.add(results.get(i));
 		
 		Set<Integer> crossoverOperations = results.get(0).crossoverOperations();
@@ -49,7 +53,7 @@ public class Population<T extends Individual<T>> {
 		
 		double p = 0.6;
 		int k = 2;
-		while(population.size() < POP_SIZE) {
+		while(population.size() < populationSize) {
 			T mom = tournamentSelect(results, p, k);
 			T dad;
 			while((dad = tournamentSelect(results, p, k)) == mom);

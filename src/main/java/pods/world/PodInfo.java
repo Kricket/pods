@@ -9,6 +9,8 @@ import util.Vec;
  * Simple bean to hold basic information about a Pod. This is used internally by the PodWorld.
  */
 public class PodInfo {
+	public static final long CHECK_BONUS = (long) (PodWorld.WORLD_X + PodWorld.WORLD_Y);
+	
 	public Vec pos;
 	public Vec vel = Vec.ORIGIN;
 	/**
@@ -26,5 +28,22 @@ public class PodInfo {
 		p.nextCheckId = nextCheck;
 		p.vel = vel;
 		return p;
+	}
+	
+	/**
+	 * Get a score for how far along this pod is. Higher values are better.
+	 * @param world
+	 * @return
+	 */
+	public long score(PodWorld world) {
+		// Every checkpoint passed gives a bonus (equal to a rough estimate of the max distance between checks)
+		long score = (laps * world.getCheckpoints().size() + nextCheck) * CHECK_BONUS;
+		
+		// After that, extra points for being closer to the following check
+		double dist = pos.minus(world.getCheckpoints().get(nextCheck)).norm();
+		if(dist < CHECK_BONUS)
+			score += CHECK_BONUS - dist;
+		
+		return score;
 	}
 }

@@ -21,7 +21,6 @@ import util.Matrix;
 import util.Vec;
 
 public class GeNNController extends GeNN<GeNNController> implements Controller {
-	public static final long CHECK_BONUS = (long) (PodWorld.WORLD_X + PodWorld.WORLD_Y);
 	public static final int INPUT_SIZE = 8, OUTPUT_SIZE = 3;
 	public static final int MUT_REPLACE = 0, MUT_SIGN = 1, MUT_MULT = 2, MUT_ADD = 3;
 	public static final int CROSS_WEIGHT = 0, CROSS_NEURON = 1, CROSS_LAYER = 2;
@@ -78,12 +77,12 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 				worldIt = startingPositions.keySet().iterator();
 			}
 			
-			System.out.println("Changing worlds...");
+//			System.out.println("Changing worlds...");
 			currentWorld = worldIt.next();
 			posIt = startingPositions.get(currentWorld).iterator();
 		}
 		
-		System.out.println("Changing starting position...");
+//		System.out.println("Changing starting position...");
 		startingPos = posIt.next();
 	}
 	
@@ -166,15 +165,7 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 			currentWorld.step();
 		}
 		
-		// Every checkpoint passed gives a bonus (equal to a rough estimate of the max distance between checks)
-		long score = (pod.laps * currentWorld.getCheckpoints().size() + pod.nextCheck) * CHECK_BONUS;
-		
-		// After that, extra points for being closer to the following check
-		double dist = pod.pos.minus(currentWorld.getCheckpoints().get(pod.nextCheck)).norm();
-		if(dist < CHECK_BONUS)
-			score += CHECK_BONUS - dist;
-		
-		return score;
+		return pod.score(currentWorld);
 	}
 	
 	public PlayOutput play(PlayInput pi) {
@@ -182,7 +173,14 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		Matrix output = forward(input);
 		
 		PlayOutput play = new PlayOutput();
-		play.setDir(new Vec((output.at(0, 0) - 0.5) * 2. * PodWorld.WORLD_X, (output.at(1, 0) - 0.5) * 2. * PodWorld.WORLD_Y).plus(pi.pos));
+		play.setDir(new Vec(
+				// Start with the output direction...
+				output.at(0, 0),
+				output.at(1, 0))
+			// Stretch it to increase precision (since it will be rounded)
+			.times(100000.)
+			// Move it, since the input is relative to the position
+			.plus(pi.pos));
 		
 		play.setThrust((int) (output.at(2, 0) * 101.));
 		return play;
@@ -198,14 +196,18 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		Vec dir = Vec.UNIT.rotate(pi.angle);
 		Vec vel = pi.vel.scale(1. / 700., 1. / 700.);
 		
-		// Make the checkpoints relative: the next check is relative to the pod...
+		// Make the checkpoints relative: the next check is relative to the pod, and
+		// the following check is relative to the next. Since we're making everything
+		// relative to the pod, there's no need for world-relative scaling: we can keep
+		// the x and y axes scaled the same way.
 		Vec nextCheck = pi.nextCheck
 				.minus(pi.pos)
-				.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
-		// ...and the following check is relative to the next.
+				//.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
+				.times(0.0001);
 		Vec followingCheck = currentWorld.getCheckpoints().get(pi.nextCheckId)
 				.minus(pi.nextCheck)
-				.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
+				//.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
+				.times(0.0001);
 		
 		m.set(0, 0, vel.x);
 		m.set(1, 0, vel.y);
@@ -298,4 +300,23 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	public GeNNController clone() {
 		return new GeNNController(this);
 	}
+	
+	
+	public GeNNController climb() {
+		setupNextTest();
+		GeNNController best = this;
+		long bestFitness = fitness();
+		for(int op : crossoverOperations()) {
+			GeNNController child = clone();
+			child.mutate(op);
+			long childFitness = child.fitness();
+			if(childFitness > bestFitness) {
+				bestFitness = childFitness;
+				best = child;
+			}
+		}
+		
+		return best;
+	}
+
 }
