@@ -36,4 +36,10 @@ public class PlayOutput {
 	public int getThrust() {
 		return thrust;
 	}
+	
+	@Override
+	public String toString() {
+		return "Dir " + dir + " " + Math.atan2(dir.y, dir.x) * 180. / Math.PI
+				+ "\nThrust " + thrust;
+	}
 }

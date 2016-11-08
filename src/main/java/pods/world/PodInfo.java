@@ -40,10 +40,26 @@ public class PodInfo {
 		long score = (laps * world.getCheckpoints().size() + nextCheck) * CHECK_BONUS;
 		
 		// After that, extra points for being closer to the following check
-		double dist = pos.minus(world.getCheckpoints().get(nextCheck)).norm();
+		Vec check = world.getCheckpoints().get(nextCheck);
+		double dist = pos.minus(check).norm();
 		if(dist < CHECK_BONUS)
 			score += CHECK_BONUS - dist;
 		
+		// Finally, we get a bonus if the velocity is pointing toward the target
+		score += dirBonus(world);
+		
 		return score;
+	}
+	
+	public static final long VDOT_BONUS = (long) (PodWorld.WORLD_X + PodWorld.WORLD_Y) / 4;
+	public double dirBonus(PodWorld world) {
+		if(vel.equals(Vec.ORIGIN))
+			return 0;
+		Vec check = world.getCheckpoints().get(nextCheck);
+		Vec toCheck = check.minus(pos);
+		Vec dir = Vec.UNIT.rotate(angle);
+		
+		double dot = dir.dot(toCheck) / toCheck.norm();
+		return dot * 200.;
 	}
 }

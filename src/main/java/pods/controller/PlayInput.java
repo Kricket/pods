@@ -12,4 +12,10 @@ public class PlayInput {
 	public int nextCheckId;
 	public Vec nextCheck;
 	public Vec vel;
+	
+	@Override
+	public String toString() {
+		return "Angle: " + angle + " " + Vec.UNIT.rotate(angle)
+				+ "\nVel: " + vel;
+	}
 }

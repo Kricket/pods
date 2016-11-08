@@ -14,6 +14,7 @@ import pods.controller.nn.GeNNController;
 import pods.controller.nn.GeNNControllerFactory;
 import pods.controller.tree.TreeSearchController;
 import pods.world.Drawer;
+import pods.world.PodInfo;
 import pods.world.PodWorld;
 import util.Vec;
 
@@ -29,8 +30,11 @@ public class Experiments {
 	}
 	
 	public void testTree() {
-		PodWorld world = new PodWorld();
-		new TreeSearchController(world);
+//		PodWorld world = new PodWorld(Arrays.asList(MID, MID.scale(1.5, 0.5)));
+		PodWorld world = new PodWorld(5);
+		TreeSearchController c = new TreeSearchController(world);
+		PodInfo pod = world.getPod(c);
+		pod.pos = MID.plus(new Vec(1000, 0));
 		new Drawer(world);
 	}
 	
