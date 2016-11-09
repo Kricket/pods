@@ -12,13 +12,17 @@ import util.Vec;
 public class PodWorldTest {
 	@Test
 	public void dangleTest() {
-		for(double reqDeg=0; reqDeg<360; reqDeg++) {
-			for(double realDeg=0; realDeg<360; realDeg++) {
+		for(double reqDeg=181; reqDeg<360; reqDeg++) {
+			for(double realDeg=163; realDeg<360; realDeg++) {
 				double realRad = Math.toRadians(realDeg);
 				double reqFixedRad = PodWorld.getRealAngle(Math.toRadians(reqDeg), realRad);
-				double changeRad = Math.abs(reqFixedRad - realRad);
+				double changeRad = Math.abs(PodWorld.inRange(reqFixedRad - realRad));
 				assertTrue("At " + realDeg + " requested " + reqDeg + " gives " + Math.toDegrees(changeRad),
 						changeRad < PodWorld.MAX_TURN + 0.000001);
+				assertTrue("At " + realDeg + " requested " + reqDeg + " gives " + Math.toDegrees(reqFixedRad),
+						reqFixedRad < Math.PI + 0.000001);
+				assertTrue("At " + realDeg + " requested " + reqDeg + " gives " + Math.toDegrees(reqFixedRad),
+						reqFixedRad > -(Math.PI + 0.000001));
 			}
 		}
 	}

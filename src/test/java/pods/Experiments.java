@@ -35,6 +35,7 @@ public class Experiments {
 		TreeSearchController c = new TreeSearchController(world);
 		PodInfo pod = world.getPod(c);
 		pod.pos = MID.plus(new Vec(1000, 0));
+		world.addPlayer(new SimpleController());
 		new Drawer(world);
 	}
 	

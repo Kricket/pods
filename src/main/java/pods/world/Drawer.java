@@ -15,6 +15,11 @@ import util.Vec;
 public class Drawer implements ActionListener {
 	public static final double SCALE = 0.01;
 	public static final Vec SHIFT = new Vec(20, 20);
+	public static final Color[] POD_COLORS = new Color[] {Color.green, Color.blue, Color.orange};
+	public static final Color BACKGROUND = Color.white;
+	public static final Color DEFAULT_COLOR = Color.black;
+	public static final Color DIR_COLOR = Color.magenta;
+	public static final Color VEL_COLOR = Color.cyan;
 	
 	public static Vec adjust(Vec v) {
 		return v.times(SCALE).plus(SHIFT);
@@ -46,30 +51,37 @@ public class Drawer implements ActionListener {
 		@Override
 		protected void paintComponent(Graphics g) {
 			super.paintComponent(g);
-			g.setColor(Color.white);
+			g.setColor(BACKGROUND);
 			g.clearRect(0, 0, getWidth(), getHeight());
-			rect(g, Vec.ORIGIN, new Vec(PodWorld.WORLD_X, PodWorld.WORLD_Y), Color.black);
+			rect(g, Vec.ORIGIN, new Vec(PodWorld.WORLD_X, PodWorld.WORLD_Y), DEFAULT_COLOR);
 			
 			for(int i=0; i<world.getCheckpoints().size(); i++) {
 				Vec check = world.getCheckpoints().get(i);
-				circle(g, check, PodWorld.CHECK_RADIUS, world.getPods().get(0).nextCheck == i ? Color.red : Color.black);
+				circle(g, check, PodWorld.CHECK_RADIUS, colorForCheck(world, i));
 			}
 			
-			for(PodInfo pod : world.getPods()) {
-				drawPod(g, pod);
-			}
+			for(int i=0; i<world.getPods().size(); i++)
+				drawPod(g, world.getPods().get(i), i);
 		}
 		
-		private void drawPod(Graphics g, PodInfo pod) {
+		private Color colorForCheck(PodWorld world, int check) {
+			for(int i=0; i<world.getPods().size(); i++) {
+				if(world.getPods().get(i).nextCheck == check)
+					return POD_COLORS[i];
+			}
+			return Color.black;
+		}
+
+		private void drawPod(Graphics g, PodInfo pod, int idx) {
 			Vec dir = Vec.UNIT.rotate(pod.angle).times(PodWorld.POD_RADIUS);
-			circle(g, pod.pos, PodWorld.POD_RADIUS, Color.green);
+			circle(g, pod.pos, PodWorld.POD_RADIUS, POD_COLORS[idx]);
 			
 			// Draw facing vector
 			dir = dir.times(5);
-			line(g, pod.pos, pod.pos.plus(dir), Color.magenta);
+			line(g, pod.pos, pod.pos.plus(dir), DIR_COLOR);
 			
 			// Draw velocity
-			line(g, pod.pos, pod.pos.plus(pod.vel.times(3)), Color.cyan);
+			line(g, pod.pos, pod.pos.plus(pod.vel.times(3)), VEL_COLOR);
 		}
 	}
 	

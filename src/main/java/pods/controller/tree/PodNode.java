@@ -10,8 +10,8 @@ import pods.world.PodWorld;
 import util.Vec;
 
 public class PodNode {
-	public static final int ADVANCE_STEPS = 3;
-	public static final int DEPTH = 6;
+	public static final int ADVANCE_STEPS = 2;
+	public static final int DEPTH = 8;
 
 	public static enum Turn {
 		NEG, POS, ZERO;

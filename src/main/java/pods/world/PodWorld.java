@@ -160,18 +160,27 @@ The provided angle is absolute. 0° means facing EAST while 90° means facing SOUT
 	}
 
 	public static double getRealAngle(double requestedAngle, double angle) {
-		double dAngle = requestedAngle - angle;
-		if(dAngle > Math.PI)
-			dAngle -= 2*Math.PI;
-		else if(dAngle < -Math.PI)
-			dAngle += 2*Math.PI;
-		
+		double dAngle = inRange(requestedAngle - angle);
 		if(dAngle > MAX_TURN)
 			dAngle = MAX_TURN;
 		else if(dAngle < -MAX_TURN)
 			dAngle = -MAX_TURN;
 		
-		return angle + dAngle;
+		return inRange(angle + dAngle);
+	}
+	
+	/**
+	 * Bring the given angle in the range (-PI, PI).
+	 * @param angle An angle between (-5PI/2, 5PI/2)
+	 * @return
+	 */
+	public static double inRange(double angle) {
+		if(angle < -Math.PI)
+			return angle + 2*Math.PI;
+		else if(angle > Math.PI)
+			return angle - 2*Math.PI;
+		else
+			return angle;
 	}
 
 	public List<Vec> getCheckpoints() {
