@@ -6,11 +6,25 @@ import util.Vec;
  * Simple bean to hold the input for a Controller for one turn.
  */
 public class PlayInput {
+	/**
+	 * Location of the pod
+	 */
 	public Vec pos;
-	// Cheating here: this is supposed to be in degrees...
+	/**
+	 * Direction the pod is facing, in radians
+	 */
 	public double angle;
+	/**
+	 * ID of the next check
+	 */
 	public int nextCheckId;
+	/**
+	 * Coordinates of the next check
+	 */
 	public Vec nextCheck;
+	/**
+	 * The pod's speed
+	 */
 	public Vec vel;
 	
 	@Override

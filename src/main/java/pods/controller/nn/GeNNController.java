@@ -3,11 +3,9 @@ package pods.controller.nn;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import nn.GeNN;
@@ -21,9 +19,13 @@ import util.Matrix;
 import util.Vec;
 
 public class GeNNController extends GeNN<GeNNController> implements Controller {
-	public static final int INPUT_SIZE = 8, OUTPUT_SIZE = 3;
+	public static final int INPUT_SIZE = 6, OUTPUT_SIZE = 3;
 	public static final int MUT_REPLACE = 0, MUT_SIGN = 1, MUT_MULT = 2, MUT_ADD = 3;
 	public static final int CROSS_WEIGHT = 0, CROSS_NEURON = 1, CROSS_LAYER = 2;
+	
+	private static final double DIR_STRETCH = 1000000., THR_STRETCH = 101.;
+	private static final Vec DIR_ADJ = new Vec(-0.5, -0.5);
+	
 	private static final Set<Integer> mutations, crossovers;
 	static {
 		Set<Integer> s = new HashSet<Integer>();
@@ -50,46 +52,31 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	 * @param _worlds
 	 */
 	public static void prepare(Collection<PodWorld> worlds) {
+		GeNNController.worlds = worlds;
 		wrapper = new ControllerWrapper();
 		for(PodWorld world : worlds) {
 			world.addPlayer(wrapper);
-			buildStartingPositions(world);
 		}
-	}
-	
-	private static void buildStartingPositions(PodWorld world) {
-		List<Vec> positions = new ArrayList<Vec>();
-		Vec check = world.getCheckpoints().get(0);
-		for(double angle=0; angle < 2*Math.PI; angle+=Math.PI/2.5) {
-			positions.add(Vec.UNIT.rotate(angle).times(3000.).plus(check));
-		}
-		Collections.shuffle(positions);
-		
-		startingPositions.put(world, positions);
 	}
 
 	private static Iterator<PodWorld> worldIt;
-	private static Iterator<Vec> posIt;
-	private static Vec startingPos;
+	private static Vec currentStartingPos;
+	/**
+	 * Step to the next world/position configuration
+	 */
 	public static void setupNextTest() {
-		if(posIt == null || !posIt.hasNext()) {
-			if(worldIt == null || !worldIt.hasNext()) {
-				worldIt = startingPositions.keySet().iterator();
-			}
-			
-//			System.out.println("Changing worlds...");
-			currentWorld = worldIt.next();
-			posIt = startingPositions.get(currentWorld).iterator();
+		if(worldIt == null || !worldIt.hasNext()) {
+			worldIt = worlds.iterator();
 		}
 		
-//		System.out.println("Changing starting position...");
-		startingPos = posIt.next();
+		currentWorld = worldIt.next();
+		currentStartingPos = currentWorld.getCheckpoints().get(0).minus(new Vec(2500, 2500));
 	}
 	
 	private static ControllerWrapper wrapper;
 	private static PodWorld currentWorld;
 	
-	private static Map<PodWorld, List<Vec>> startingPositions = new HashMap<PodWorld, List<Vec>>();
+	private static Collection<PodWorld> worlds;
 	private static final List<Vec> startingVelocities;
 	private static final List<Double> startingDirections;
 	static {
@@ -149,7 +136,7 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		for(Vec vel : startingVelocities) {
 			for(double dir : startingDirections) {
 				PodInfo pod = currentWorld.getPod(wrapper);
-				pod.pos = startingPos;
+				pod.pos = currentStartingPos;
 				pod.vel = vel;
 				pod.angle = dir;
 				pod.laps = 0;
@@ -171,18 +158,31 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	public PlayOutput play(PlayInput pi) {
 		Matrix input = buildInput(pi);
 		Matrix output = forward(input);
-		
+		return buildOutput(pi, output);
+	}
+	
+	/**
+	 * Build the actual Play based on the input and output from the NN.
+	 * @param pi
+	 * @param output The output of the NN
+	 * @return
+	 */
+	public static PlayOutput buildOutput(PlayInput pi, Matrix output) {
 		PlayOutput play = new PlayOutput();
 		play.setDir(new Vec(
 				// Start with the output direction...
 				output.at(0, 0),
 				output.at(1, 0))
+			// Adjust it so that we can have negative values
+			.plus(DIR_ADJ)
 			// Stretch it to increase precision (since it will be rounded)
-			.times(100000.)
+			.times(DIR_STRETCH)
+			// Rotate the result, since we standardized the rotation in the input
+			.rotate(pi.angle)
 			// Move it, since the input is relative to the position
 			.plus(pi.pos));
 		
-		play.setThrust((int) (output.at(2, 0) * 101.));
+		play.setThrust((int) (output.at(2, 0) * THR_STRETCH));
 		return play;
 	}
 
@@ -191,32 +191,32 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	 * @param pi
 	 * @return
 	 */
-	private Matrix buildInput(PlayInput pi) {
+	public static Matrix buildInput(PlayInput pi) {
 		Matrix m = new Matrix(INPUT_SIZE, 1);
-		Vec dir = Vec.UNIT.rotate(pi.angle);
-		Vec vel = pi.vel.scale(1. / 700., 1. / 700.);
-		
-		// Make the checkpoints relative: the next check is relative to the pod, and
-		// the following check is relative to the next. Since we're making everything
-		// relative to the pod, there's no need for world-relative scaling: we can keep
-		// the x and y axes scaled the same way.
+		/*
+		 * To reduce the dimensionality of the input/simplify the task of the network:
+		 * 1. All checkpoints become relative to the pod. A consequence of this is that all
+		 *    scaling is absolute - we don't care what the dimensions of the map are.
+		 * 2. All positions are rotated so that the pod is facing straight down the +x axis.
+		 *    This should reduce complexity since the network doesn't have to take the pod's
+		 *    facing vector into account.
+		 */
+		Vec vel = pi.vel.rotate(-pi.angle).scale(1. / 700., 1. / 700.);
 		Vec nextCheck = pi.nextCheck
 				.minus(pi.pos)
-				//.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
+				.rotate(-pi.angle)
 				.times(0.0001);
 		Vec followingCheck = currentWorld.getCheckpoints().get(pi.nextCheckId)
-				.minus(pi.nextCheck)
-				//.scale(1. / PodWorld.WORLD_X, 1. / PodWorld.WORLD_Y);
+				.minus(pi.pos)
+				.rotate(-pi.angle)
 				.times(0.0001);
 		
 		m.set(0, 0, vel.x);
 		m.set(1, 0, vel.y);
-		m.set(2, 0, dir.x);
-		m.set(3, 0, dir.y);
-		m.set(4, 0, nextCheck.x);
-		m.set(5, 0, nextCheck.y);
-		m.set(6, 0, followingCheck.x);
-		m.set(7, 0, followingCheck.y);
+		m.set(2, 0, nextCheck.x);
+		m.set(3, 0, nextCheck.y);
+		m.set(4, 0, followingCheck.x);
+		m.set(5, 0, followingCheck.y);
 		
 		return m;
 	}
@@ -301,12 +301,15 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		return new GeNNController(this);
 	}
 	
-	
+	/**
+	 * Try all the mutations possible (including none) and return the best result.
+	 * @return
+	 */
 	public GeNNController climb() {
 		setupNextTest();
 		GeNNController best = this;
 		long bestFitness = fitness();
-		for(int op : crossoverOperations()) {
+		for(int op : mutations) {
 			GeNNController child = clone();
 			child.mutate(op);
 			long childFitness = child.fitness();
@@ -319,4 +322,52 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		return best;
 	}
 
+	/**
+	 * Use backpropagation to train this network to approximate the same results as the given controller.
+	 */
+	public void imitate(Controller hero) {
+		Gradient grad = null;
+		int batchSize = 0;
+		for(Vec vel : startingVelocities) {
+			for(double dir : startingDirections) {
+				PodInfo pod = currentWorld.getPod(wrapper);
+				pod.pos = currentStartingPos;
+				pod.vel = vel;
+				pod.angle = dir;
+				pod.laps = 0;
+				pod.nextCheck = 0;
+				
+				PlayInput pi = pod.buildPlayInfo(currentWorld.getCheckpoints());
+				
+				// What would jesus do?
+				PlayOutput heroicPlay = hero.play(pi);
+				// Next: what SHOULD my Matrix output be, in order to produce the same result?
+				Gradient g = backprop(buildInput(pi), getOutputForPlay(pi, heroicPlay));
+				if(grad == null)
+					grad = g;
+				else
+					grad.plusEquals(g);
+				batchSize++;
+			}
+		}
+		
+		apply(grad, 1. / batchSize);
+	}
+	
+	/**
+	 * Generate a Matrix that, were it the output from the NN, would generate the given play.
+	 * @param pi The input to the NN.
+	 * @param play The play we wish to reproduce
+	 * @return 
+	 */
+	public static Matrix getOutputForPlay(PlayInput pi, PlayOutput play) {
+		Matrix output = new Matrix(OUTPUT_SIZE, 1);
+		output.data[2] = play.getThrust() / THR_STRETCH;
+		Vec playDir = play.getDir().minus(pi.pos).rotate(-pi.angle);
+		playDir = playDir.times(1. / playDir.norm()).minus(DIR_ADJ);
+		output.data[0] = playDir.x;
+		output.data[1] = playDir.y;
+		
+		return output;
+	}
 }

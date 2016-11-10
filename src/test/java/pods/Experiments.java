@@ -7,8 +7,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 
-import org.junit.Test;
-
 import pods.controller.SimpleController;
 import pods.controller.nn.GeNNController;
 import pods.controller.nn.GeNNControllerFactory;
@@ -20,7 +18,7 @@ import util.Vec;
 
 public class Experiments {
 	public static void main(String[] args) {
-		new Experiments().testTree();
+		new Experiments().testBackprop();
 	}
 	
 	public void simple() {
@@ -39,9 +37,8 @@ public class Experiments {
 		new Drawer(world);
 	}
 	
-	@Test
 	public void testClimb() {
-		HashSet<PodWorld> worlds = buildWorlds();
+		HashSet<PodWorld> worlds = buildWorlds(7);
 		GeNNController.prepare(worlds);
 		
 		GeNNController indiv = new GeNNController(10);
@@ -77,14 +74,13 @@ public class Experiments {
 		System.out.println("Running...");
 	}
 	
-//	@Test
 	public void testEvolve() {
-		HashSet<PodWorld> worlds = buildWorlds();
+		HashSet<PodWorld> worlds = buildWorlds(7);
 		GeNNController.prepare(worlds);
 		System.out.println("Number of worlds: " + worlds.size());
 		
-		Population<GeNNController> population = new Population<GeNNController>(500, new GeNNControllerFactory(10));
-		GeNNController.STEPS_FOR_FITNESS = 30;
+		Population<GeNNController> population = new Population<GeNNController>(500, new GeNNControllerFactory());
+		GeNNController.STEPS_FOR_FITNESS = 5;
 		for(int i=0; i<100; i++) {
 			if(i % 10 == 0) {
 				GeNNController.setupNextTest();
@@ -92,7 +88,7 @@ public class Experiments {
 			population.newGeneration();
 		}
 		
-		GeNNController.STEPS_FOR_FITNESS = 100;
+		GeNNController.STEPS_FOR_FITNESS = 15;
 		for(int i=0; i<100; i++) {
 			if(i % 10 == 0) {
 				GeNNController.setupNextTest();
@@ -110,11 +106,29 @@ public class Experiments {
 		world.addPlayer(new SimpleController());
 		new Drawer(world);
 	}
+	
+	public void testBackprop() {
+		HashSet<PodWorld> worlds = buildWorlds(7);
+		GeNNController.prepare(worlds);
+		
+		GeNNController genn = new GeNNController(15, 10);
+		SimpleController hero = new SimpleController();
+		
+		for(int i=0; i<100; i++) {
+			GeNNController.setupNextTest();
+			genn.imitate(hero);
+			System.out.println("For " + i + " fitness = " + genn.fitness());
+		}
+		
+		PodWorld world = worlds.iterator().next();
+		world.addPlayer(hero);
+		new Drawer(world);
+	}
 
-	private static HashSet<PodWorld> buildWorlds() {
+	private static HashSet<PodWorld> buildWorlds(int slices) {
 		HashSet<PodWorld> worlds = new HashSet<PodWorld>();
 		boolean dist = false;
-		for(double angle = Math.PI/11; angle < 2*Math.PI; angle += 2.*Math.PI/7) {
+		for(double angle = 0; angle < 2.*Math.PI; angle += 2.*Math.PI/slices) {
 			dist = !dist;
 			Vec nextCheck = Vec.UNIT.rotate(angle).times(6000. + (dist ? 2000. : 0.)).plus(MID);
 			

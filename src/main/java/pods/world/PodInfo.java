@@ -11,15 +11,32 @@ import util.Vec;
 public class PodInfo {
 	public static final long CHECK_BONUS = (long) (PodWorld.WORLD_X + PodWorld.WORLD_Y);
 	
+	/**
+	 * Absolute coordinates of this pod
+	 */
 	public Vec pos;
+	/**
+	 * Velocity of this pod
+	 */
 	public Vec vel = Vec.ORIGIN;
 	/**
 	 * NOTE: in the real game, this is in degrees
 	 */
 	public double angle = 0;
+	/**
+	 * ID (index) of the next checkpoint
+	 */
 	public int nextCheck = 0;
+	/**
+	 * Number of laps completed
+	 */
 	public int laps = 0;
 	
+	/**
+	 * Transform this pod (the real state of the pod) into the bare information that the
+	 * Controller actually gets to use.
+	 * @param checkpoints The checkpoints of the world.
+	 */
 	public PlayInput buildPlayInfo(List<Vec> checkpoints) {
 		PlayInput p = new PlayInput();
 		p.angle = angle;
@@ -51,7 +68,11 @@ public class PodInfo {
 		return score;
 	}
 	
-	public static final long VDOT_BONUS = (long) (PodWorld.WORLD_X + PodWorld.WORLD_Y) / 4;
+	/**
+	 * Calculate a bonus to add to the score, based on how closely the pod is pointing toward the next checkpoint
+	 * @param world
+	 * @return
+	 */
 	public double dirBonus(PodWorld world) {
 		if(vel.equals(Vec.ORIGIN))
 			return 0;

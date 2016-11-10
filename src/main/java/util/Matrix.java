@@ -55,7 +55,7 @@ public class Matrix {
 	}
 	
 	/**
-	 * Initialize this with random values in (-1, 1).
+	 * Initialize this with random values in (-scale/2, scale/2).
 	 * @param r
 	 * @param c
 	 * @param scale The random values will vary from (-scale/2, scale/2)
