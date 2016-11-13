@@ -19,12 +19,31 @@ import util.Matrix;
 import util.Vec;
 
 public class GeNNController extends GeNN<GeNNController> implements Controller {
+	/**
+	 * Number of neurons in the input and output layers
+	 */
 	public static final int INPUT_SIZE = 6, OUTPUT_SIZE = 3;
+	/**
+	 * Mutation operations
+	 */
 	public static final int MUT_REPLACE = 0, MUT_SIGN = 1, MUT_MULT = 2, MUT_ADD = 3;
+	/**
+	 * Crossover operations
+	 */
 	public static final int CROSS_WEIGHT = 0, CROSS_NEURON = 1, CROSS_LAYER = 2;
 	
-	private static final double DIR_STRETCH = 1000000., THR_STRETCH = 101.;
-	private static final Vec DIR_ADJ = new Vec(-0.5, -0.5);
+	/**
+	 * Multiplier to transform world units to NN units
+	 */
+	public static final double WORLD_TO_NN_SCALE = 0.0001;
+	/**
+	 * Multipliers to transform NN output units to world units
+	 */
+	private static final double DIR_STRETCH = 1000000., THR_STRETCH = 110.;
+	/**
+	 * Direction adjustment
+	 */
+	public static final Vec DIR_ADJ = new Vec(-0.5, -0.5);
 	
 	private static final Set<Integer> mutations, crossovers;
 	static {
@@ -202,14 +221,8 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		 *    facing vector into account.
 		 */
 		Vec vel = pi.vel.rotate(-pi.angle).scale(1. / 700., 1. / 700.);
-		Vec nextCheck = pi.nextCheck
-				.minus(pi.pos)
-				.rotate(-pi.angle)
-				.times(0.0001);
-		Vec followingCheck = currentWorld.getCheckpoints().get(pi.nextCheckId)
-				.minus(pi.pos)
-				.rotate(-pi.angle)
-				.times(0.0001);
+		Vec nextCheck = worldToNN(pi, pi.nextCheck);
+		Vec followingCheck = worldToNN(pi, currentWorld.getCheckpoints().get(pi.nextCheckId));
 		
 		m.set(0, 0, vel.x);
 		m.set(1, 0, vel.y);
@@ -219,6 +232,20 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 		m.set(5, 0, followingCheck.y);
 		
 		return m;
+	}
+	
+	/**
+	 * For the given situation, transform the given Vector from absolute
+	 * world coordinates to NN coordinates (where the pod is at 0,0 facing
+	 * at 1,0, and scaled down).
+	 * @param pi
+	 * @param v
+	 * @return
+	 */
+	public static Vec worldToNN(PlayInput pi, Vec v) {
+		return v.minus(pi.pos)
+				.rotate(-pi.angle)
+				.times(WORLD_TO_NN_SCALE);
 	}
 
 	public void mutate(int op) {
@@ -337,23 +364,28 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 				pod.laps = 0;
 				pod.nextCheck = 0;
 				
-				PlayInput pi = pod.buildPlayInfo(currentWorld.getCheckpoints());
-				
-				// What would jesus do?
-				PlayOutput heroicPlay = hero.play(pi);
-				// Next: what SHOULD my Matrix output be, in order to produce the same result?
-				Gradient g = backprop(buildInput(pi), getOutputForPlay(pi, heroicPlay));
+				Gradient g = doImitate(pod, hero);
 				if(grad == null)
 					grad = g;
 				else
 					grad.plusEquals(g);
 				batchSize++;
 			}
+			
+			apply(grad, .1 / batchSize);
+			grad = null;
 		}
-		
-		apply(grad, 1. / batchSize);
 	}
 	
+	public Gradient doImitate(PodInfo pod, Controller hero) {
+		PlayInput pi = pod.buildPlayInfo(currentWorld.getCheckpoints());
+		
+		// What would jesus do?
+		PlayOutput heroicPlay = hero.play(pi);
+		// Next: what SHOULD my Matrix output be, in order to produce the same result?
+		return backprop(buildInput(pi), getOutputForPlay(pi, heroicPlay));
+	}
+
 	/**
 	 * Generate a Matrix that, were it the output from the NN, would generate the given play.
 	 * @param pi The input to the NN.
@@ -363,8 +395,16 @@ public class GeNNController extends GeNN<GeNNController> implements Controller {
 	public static Matrix getOutputForPlay(PlayInput pi, PlayOutput play) {
 		Matrix output = new Matrix(OUTPUT_SIZE, 1);
 		output.data[2] = play.getThrust() / THR_STRETCH;
-		Vec playDir = play.getDir().minus(pi.pos).rotate(-pi.angle);
-		playDir = playDir.times(1. / playDir.norm()).minus(DIR_ADJ);
+		// Step 1: transform the direction to NN coordinates
+		Vec playDir = worldToNN(pi, play.getDir());
+		// Step 2: Each coordinate must be in (-.5, .5) and the ratio must be the same
+		double largest = Math.max(Math.abs(playDir.x), Math.abs(playDir.y));
+		if(largest > 0.5) {
+			// Scale back to an average of 0.25
+			playDir = playDir.times(1. / (largest * 4.));
+		}
+		playDir = playDir.minus(DIR_ADJ);
+		
 		output.data[0] = playDir.x;
 		output.data[1] = playDir.y;
 		

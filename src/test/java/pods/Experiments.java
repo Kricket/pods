@@ -111,12 +111,14 @@ public class Experiments {
 		HashSet<PodWorld> worlds = buildWorlds(7);
 		GeNNController.prepare(worlds);
 		
-		GeNNController genn = new GeNNController(15, 10);
+		GeNNController genn = new GeNNController(10);
 		SimpleController hero = new SimpleController();
 		
-		for(int i=0; i<100; i++) {
+		for(int i=0; i<1000; i++) {
 			GeNNController.setupNextTest();
 			genn.imitate(hero);
+			
+			genn.clearFitness();
 			System.out.println("For " + i + " fitness = " + genn.fitness());
 		}
 		

@@ -1,6 +1,11 @@
 package util;
 
 public final class Vec {
+	/**
+	 * Precision for equality
+	 */
+	public static final double PRECISION = 0.0000000001;
+	
 	/** The 0 vector */
 	public static final Vec ORIGIN = new Vec(0,0);
 	/** Unit vector (1,0) */
@@ -96,7 +101,8 @@ public final class Vec {
 	public boolean equals(Object obj) {
 		if(obj instanceof Vec) {
 			Vec v = (Vec) obj;
-			return x == v.x && y == v.y;
+			return Math.abs(x - v.x) < PRECISION
+					&& Math.abs(y - v.y) < PRECISION;
 		}
 		return false;
 	}
